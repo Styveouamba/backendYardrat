@@ -2,6 +2,28 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { initializePayment } from '../services/nabooPayService';
 
+const normalizeSenegalNumber = (phone: string): string => {
+  const digits = phone.replace(/\D+/g, '');
+
+  if (/^221\d{9}$/.test(digits)) {
+    return `+${digits}`;
+  }
+
+  if (/^00221\d{9}$/.test(digits)) {
+    return `+${digits.slice(2)}`;
+  }
+
+  if (/^0\d{9}$/.test(digits)) {
+    return `+221${digits.slice(1)}`;
+  }
+
+  if (/^[7-9]\d{8}$/.test(digits)) {
+    return `+221${digits}`;
+  }
+
+  return phone;
+};
+
 export const initiatePayment = async (
   req: AuthRequest,
   res: Response
@@ -35,12 +57,21 @@ export const initiatePayment = async (
       return;
     }
 
+    const normalizedDestination = normalizeSenegalNumber(destination.trim());
+    if (normalizedDestination !== destination.trim()) {
+      console.log('[Payment] Normalized destination', {
+        userId: user._id.toString(),
+        originalDestination: destination.trim(),
+        normalizedDestination,
+      });
+    }
+
     const paymentMethod = direction === 'waveToOrange' ? 'wave' : 'orange_money';
     console.log('[Payment] Initializing payment', {
       userId: user._id.toString(),
       amount: parsedAmount,
       direction,
-      destination: destination.trim(),
+      destination: normalizedDestination,
       paymentMethod,
     });
 
@@ -48,7 +79,7 @@ export const initiatePayment = async (
       parsedAmount,
       paymentMethod,
       direction as 'waveToOrange' | 'orangeToWave',
-      destination.trim(),
+      normalizedDestination,
       user._id.toString()
     );
 

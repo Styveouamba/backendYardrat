@@ -36,8 +36,14 @@ interface NabooPaymentResponse {
 
 const NABOO_API_KEY = process.env.NABOO_API_KEY || '';
 const NABOO_API_URL = process.env.NABOO_API_URL || 'https://api.naboopay.com';
-const BACKEND_URL = process.env.API_URL?.trim().replace(/\/$/, '') || 'http://localhost:5000';
+const API_URL_RAW = process.env.API_URL?.trim();
+const BACKEND_URL = API_URL_RAW?.replace(/\/$/, '') || 'http://localhost:5000';
 
+console.log('[NabooPay] Backend URL config', {
+  API_URL_RAW,
+  BACKEND_URL,
+  NABOO_API_URL,
+});
 export const initializePayment = async (
   amount: number,
   paymentMethod: string,

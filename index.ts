@@ -8,6 +8,11 @@ import paymentRoutes from './routes/paymentRoutes';
 
 // Charger les variables d'environnement
 dotenv.config();
+console.log('[Config] ENV loaded', {
+  NODE_ENV: process.env.NODE_ENV,
+  API_URL: process.env.API_URL,
+  NABOO_API_URL: process.env.NABOO_API_URL,
+});
 
 // Créer l'application Express
 const app: Application = express();
