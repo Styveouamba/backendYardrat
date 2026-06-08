@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
-import { initializePayment } from '../services/nabooPayService';
+import { initializePayment, executePayout } from '../services/nabooPayService';
 
 const normalizeSenegalNumber = (phone: string): string => {
   const digits = phone.replace(/\D+/g, '');
@@ -97,15 +97,47 @@ export const initiatePayment = async (
 export const paymentSuccess = async (req: Request, res: Response): Promise<void> => {
   const rawDestination = req.query.destination as string;
   const direction = req.query.direction as string;
+  const amountStr = req.query.amount as string;
 
-  // Reconstruire le + retiré pour NabooPay
   const destination = rawDestination?.startsWith('221')
     ? `+${rawDestination}`
     : rawDestination;
 
-  console.log('[Payment] Success callback', { direction, destination });
+  const payoutMethod = direction === 'waveToOrange' ? 'orange_money' : 'wave';
 
-  res.status(200).json({ success: true, message: 'Paiement réussi, merci.', direction, destination });
+  console.log('[Payment] Success callback — triggering payout', {
+    direction,
+    destination,
+    payoutMethod,
+    amount: amountStr,
+  });
+
+  try {
+    const payout = await executePayout(
+      Number(amountStr),
+      payoutMethod,
+      destination,
+    );
+
+    console.log('[Payment] Payout executed', {
+      orderId: payout.order_id,
+      status: payout.payout_status,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Paiement reçu et transfert effectué.',
+      payoutStatus: payout.payout_status,
+      payoutOrderId: payout.order_id,
+    });
+  } catch (error: any) {
+    console.error('[Payment] Payout failed after success callback:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Paiement reçu mais le transfert a échoué.',
+      error: error.message,
+    });
+  }
 };
 
 export const paymentError = async (req: Request, res: Response): Promise<void> => {

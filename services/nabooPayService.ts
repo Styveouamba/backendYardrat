@@ -34,6 +34,37 @@ interface NabooPaymentResponse {
   is_merchant: boolean;
 }
 
+interface NabooPayoutRequest {
+  selected_payment_method: string;
+  amount: number;
+  recipient: {
+    first_name: string;
+    last_name: string;
+    phone: string;
+  };
+  reason: string;
+}
+
+interface NabooPayoutResponse {
+  _id: string;
+  order_id: string;
+  selected_payment_method: string;
+  amount: number;
+  fees: number;
+  currency: string;
+  recipient: {
+    first_name: string;
+    last_name: string;
+    phone: string;
+  };
+  payout_status: string;
+  reason: string;
+  provider_reference?: string;
+  created_at: string;
+  updated_at: string;
+  paid_at?: string;
+}
+
 const NABOO_API_KEY = process.env.NABOO_API_KEY || '';
 const NABOO_API_URL = process.env.NABOO_API_URL || 'https://api.naboopay.com';
 const API_URL_RAW = process.env.API_URL?.trim();
@@ -53,7 +84,6 @@ export const initializePayment = async (
   userId: string,
 ): Promise<NabooPaymentResponse> => {
   try {
-    // Retirer le + pour éviter l'encodage %2B rejeté par NabooPay
     const cleanDestination = destination.replace('+', '');
 
     const payload: NabooPaymentRequest = {
@@ -66,8 +96,8 @@ export const initializePayment = async (
           description: `Transfert ${direction === 'waveToOrange' ? 'Wave vers Orange' : 'Orange vers Wave'}`,
         },
       ],
-      success_url: `${BACKEND_URL}/api/payment/success?direction=${direction}&destination=${cleanDestination}`,
-      error_url: `${BACKEND_URL}/api/payment/error?direction=${direction}&destination=${cleanDestination}`,
+      success_url: `${BACKEND_URL}/api/payment/success?direction=${direction}&destination=${cleanDestination}&amount=${amount}`,
+      error_url: `${BACKEND_URL}/api/payment/error?direction=${direction}&destination=${cleanDestination}&amount=${amount}`,
       fees_customer_side: false,
       is_escrow: false,
       customer: {
@@ -105,7 +135,7 @@ export const initializePayment = async (
       }
     );
 
-    const result = {
+    const result: NabooPaymentResponse = {
       order_id: response.data.order_id,
       amount: response.data.amount,
       method_of_payment: response.data.method_of_payment,
@@ -138,8 +168,67 @@ export const initializePayment = async (
         `NabooPay API error: ${JSON.stringify(axiosError.response?.data) || axiosError.message}`
       );
     }
-
     console.error('[NabooPay] Unexpected error:', error);
     throw new Error('Failed to initialize payment with NabooPay');
+  }
+};
+
+export const executePayout = async (
+  amount: number,
+  paymentMethod: string, // 'orange_money' ou 'wave'
+  destination: string,   // numéro avec +221
+): Promise<NabooPayoutResponse> => {
+  try {
+    const payload: NabooPayoutRequest = {
+      selected_payment_method: paymentMethod,
+      amount,
+      recipient: {
+        first_name: 'Client',
+        last_name: destination.replace('+', ''),
+        phone: destination,
+      },
+      reason: 'Transfert inter-opérateur Yardrat',
+    };
+
+    console.log('[NabooPay] Sending payout request', {
+      amount,
+      paymentMethod,
+      destination,
+    });
+
+    const response = await axios.post(
+      `${NABOO_API_URL}/api/v2/payouts`,
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${NABOO_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 15000,
+      }
+    );
+
+    console.log('[NabooPay] Payout succeeded', {
+      orderId: response.data.order_id,
+      status: response.data.payout_status,
+      amount: response.data.amount,
+      fees: response.data.fees,
+    });
+
+    return response.data as NabooPayoutResponse;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError;
+      console.error('[NabooPay] Payout failed:', {
+        status: axiosError.response?.status,
+        data: axiosError.response?.data,
+        message: axiosError.message,
+      });
+      throw new Error(
+        `NabooPay Payout error: ${JSON.stringify(axiosError.response?.data) || axiosError.message}`
+      );
+    }
+    console.error('[NabooPay] Unexpected payout error:', error);
+    throw new Error('Failed to execute payout with NabooPay');
   }
 };
