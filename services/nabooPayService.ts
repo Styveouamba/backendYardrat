@@ -44,6 +44,7 @@ console.log('[NabooPay] Backend URL config', {
   BACKEND_URL,
   NABOO_API_URL,
 });
+
 export const initializePayment = async (
   amount: number,
   paymentMethod: string,
@@ -52,6 +53,9 @@ export const initializePayment = async (
   userId: string,
 ): Promise<NabooPaymentResponse> => {
   try {
+    // Retirer le + pour éviter l'encodage %2B rejeté par NabooPay
+    const cleanDestination = destination.replace('+', '');
+
     const payload: NabooPaymentRequest = {
       method_of_payment: [paymentMethod],
       products: [
@@ -62,13 +66,13 @@ export const initializePayment = async (
           description: `Transfert ${direction === 'waveToOrange' ? 'Wave vers Orange' : 'Orange vers Wave'}`,
         },
       ],
-      success_url: `${BACKEND_URL}/api/payment/success?direction=${direction}&destination=${encodeURIComponent(destination)}`,
-      error_url: `${BACKEND_URL}/api/payment/error?direction=${direction}&destination=${encodeURIComponent(destination)}`,
+      success_url: `${BACKEND_URL}/api/payment/success?direction=${direction}&destination=${cleanDestination}`,
+      error_url: `${BACKEND_URL}/api/payment/error?direction=${direction}&destination=${cleanDestination}`,
       fees_customer_side: false,
       is_escrow: false,
       customer: {
         first_name: 'Client',
-        last_name: destination,
+        last_name: cleanDestination,
         phone: destination,
         email: `${userId}@example.com`,
       },

@@ -1,25 +1,14 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { initializePayment } from '../services/nabooPayService';
 
 const normalizeSenegalNumber = (phone: string): string => {
   const digits = phone.replace(/\D+/g, '');
 
-  if (/^221\d{9}$/.test(digits)) {
-    return `+${digits}`;
-  }
-
-  if (/^00221\d{9}$/.test(digits)) {
-    return `+${digits.slice(2)}`;
-  }
-
-  if (/^0\d{9}$/.test(digits)) {
-    return `+221${digits.slice(1)}`;
-  }
-
-  if (/^[7-9]\d{8}$/.test(digits)) {
-    return `+221${digits}`;
-  }
+  if (/^221\d{9}$/.test(digits)) return `+${digits}`;
+  if (/^00221\d{9}$/.test(digits)) return `+${digits.slice(2)}`;
+  if (/^0\d{9}$/.test(digits)) return `+221${digits.slice(1)}`;
+  if (/^[7-9]\d{8}$/.test(digits)) return `+221${digits}`;
 
   return phone;
 };
@@ -58,13 +47,11 @@ export const initiatePayment = async (
     }
 
     const normalizedDestination = normalizeSenegalNumber(destination.trim());
-    if (normalizedDestination !== destination.trim()) {
-      console.log('[Payment] Normalized destination', {
-        userId: user._id.toString(),
-        originalDestination: destination.trim(),
-        normalizedDestination,
-      });
-    }
+    console.log('[Payment] Normalized destination', {
+      userId: user._id.toString(),
+      originalDestination: destination.trim(),
+      normalizedDestination,
+    });
 
     const paymentMethod = direction === 'waveToOrange' ? 'wave' : 'orange_money';
     console.log('[Payment] Initializing payment', {
@@ -100,14 +87,36 @@ export const initiatePayment = async (
       message: error?.message,
       stack: error?.stack,
     });
-    res.status(500).json({ success: false, message: error.message || 'Erreur lors de l\'initialisation du paiement' });
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Erreur lors de l\'initialisation du paiement',
+    });
   }
 };
 
-export const paymentSuccess = async (_req: AuthRequest, res: Response): Promise<void> => {
-  res.status(200).json({ success: true, message: 'Paiement réussi, merci.' });
+export const paymentSuccess = async (req: Request, res: Response): Promise<void> => {
+  const rawDestination = req.query.destination as string;
+  const direction = req.query.direction as string;
+
+  // Reconstruire le + retiré pour NabooPay
+  const destination = rawDestination?.startsWith('221')
+    ? `+${rawDestination}`
+    : rawDestination;
+
+  console.log('[Payment] Success callback', { direction, destination });
+
+  res.status(200).json({ success: true, message: 'Paiement réussi, merci.', direction, destination });
 };
 
-export const paymentError = async (_req: AuthRequest, res: Response): Promise<void> => {
-  res.status(200).json({ success: false, message: 'Le paiement a échoué.' });
+export const paymentError = async (req: Request, res: Response): Promise<void> => {
+  const rawDestination = req.query.destination as string;
+  const direction = req.query.direction as string;
+
+  const destination = rawDestination?.startsWith('221')
+    ? `+${rawDestination}`
+    : rawDestination;
+
+  console.log('[Payment] Error callback', { direction, destination });
+
+  res.status(200).json({ success: false, message: 'Le paiement a échoué.', direction, destination });
 };

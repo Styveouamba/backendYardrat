@@ -8,21 +8,10 @@ const PHONE_REGEX = /^(\+221|00221)?\s?[0-9 ]{8,}$/;
 const normalizeSenegalNumber = (phone: string): string => {
   const digits = phone.replace(/\D+/g, '');
 
-  if (/^221\d{9}$/.test(digits)) {
-    return `+${digits}`;
-  }
-
-  if (/^00221\d{9}$/.test(digits)) {
-    return `+${digits.slice(2)}`;
-  }
-
-  if (/^0\d{9}$/.test(digits)) {
-    return `+221${digits.slice(1)}`;
-  }
-
-  if (/^[7-9]\d{8}$/.test(digits)) {
-    return `+221${digits}`;
-  }
+  if (/^221\d{9}$/.test(digits)) return `+${digits}`;
+  if (/^00221\d{9}$/.test(digits)) return `+${digits.slice(2)}`;
+  if (/^0\d{9}$/.test(digits)) return `+221${digits.slice(1)}`;
+  if (/^[7-9]\d{8}$/.test(digits)) return `+221${digits}`;
 
   return phone;
 };
@@ -85,7 +74,11 @@ export const createTransfer = async (
     });
   } catch (error: any) {
     console.error('[Transfer] Error creating transfer:', error);
-    res.status(500).json({ success: false, message: 'Erreur serveur lors du transfert', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur lors du transfert',
+      error: error.message,
+    });
   }
 };
 
@@ -101,11 +94,17 @@ export const getTransferHistory = async (
       return;
     }
 
-    const transfers = await Transfer.find({ userId: user._id }).sort({ createdAt: -1 }).limit(50);
+    const transfers = await Transfer.find({ userId: user._id })
+      .sort({ createdAt: -1 })
+      .limit(50);
 
     res.status(200).json({ success: true, transfers });
   } catch (error: any) {
     console.error('[Transfer] Error fetching history:', error);
-    res.status(500).json({ success: false, message: 'Erreur serveur lors de la lecture de l historique', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Erreur serveur lors de la lecture de l'historique",
+      error: error.message,
+    });
   }
 };
